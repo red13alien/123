@@ -1,0 +1,19 @@
+"CHALLENGE" {
+	"name"	"[4fun2|light|x2]"
+	"description"	"Light version. Carnage x2"
+
+	"convars" {
+		asw_horde_override 1
+		asw_wanderer_override 1
+		rd_ready_mark_override 1
+		rd_weapons_regular_allowed 7
+		rd_weapons_regular_allowed_inverted 1
+		rd_weapons_extra_allowed "20 18 19"
+		rd_weapons_extra_allowed_inverted 1
+		rd_weapon_requirement_override 1
+		rd_techreq 0
+		rd_hackall 1
+		rd_weapons_regular_class_unrestricted "1 2 3 15"
+		rd_weapons_show_hidden 1
+	}
+}

@@ -1,0 +1,18 @@
+"CHALLENGE" {
+	"name"	"[4fun|light]"
+	"description"	"Infinite ammo, no tech req, all can hack, new drones and etc."
+
+	"convars" {
+		rd_ready_mark_override 1
+		rd_weapons_regular_allowed 7
+		rd_weapons_regular_allowed_inverted 1
+		rd_weapons_extra_allowed "5 20 18 19 8"
+		rd_weapons_extra_allowed_inverted 1
+		rd_weapon_requirement_override 1
+		rd_weapons_show_hidden 1
+		rd_techreq 0
+		rd_hackall 1
+		rd_weapons_regular_class_unrestricted "1 2 3 15"
+		rd_weapons_extra_class_unrestricted 11
+	}
+}

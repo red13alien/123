@@ -1,0 +1,27 @@
+"CHALLENGE" {
+	"name"	"[4fun|light|Firstperson]"
+	"description"	"Infinite ammo, no tech req, all can hack, new drones and etc."
+
+	"convars" {
+		rd_ready_mark_override 1
+		rd_weapons_regular_allowed "7 20"
+		rd_weapons_regular_allowed_inverted 1
+		rd_weapons_extra_allowed "5 2 7 14 20 18 19 8"
+		rd_weapons_extra_allowed_inverted 1
+		rd_weapon_requirement_override 1
+		rd_techreq 0
+		rd_hackall 1
+		rd_weapons_regular_class_unrestricted "1 2 3 15"
+		rd_weapons_extra_class_unrestricted 11
+		rd_weapons_show_hidden 1
+		rd_marine_jump_height 20
+		rd_show_arrow_to_marine 0
+		asw_stim_cam_time 0
+		rd_ammo_under_marine 0
+		rd_override_allow_rotate_camera 0
+		asw_world_healthbars 0
+		asw_marine_names 0
+		asw_fast_reload_under_marine 0
+		asw_simple_hacking 1
+	}
+}

@@ -1,0 +1,281 @@
+// See the comment in alien_selection.txt for information on how to create spawn sets.
+
+"SpawnSet" {
+	"Name"	"[4fun|light]"
+	"Map"	"*"
+	"MinSkill"	"1"
+	"MaxSkill"	"5"
+	"MinHordeSize"	"10"
+	"MaxHordeSize"	"20"
+	"MinWanderers"	"30"
+	"MaxWanderers"	"40"
+	"MinHordeWanderers"	"1"
+	"MaxHordeWanderers"	"2"
+	"MinPrespawn"	"10"
+	"MaxPrespawn"	"20"
+	"MinPacks"	"10"
+	"MaxPacks"	"20"
+
+	"HORDE" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"0.8"
+		}
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"0.9"
+		}
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"1.1"
+		}
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"0.7"
+		}
+	}
+	"WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"3.2"
+			"HealthBonus"	"10000"
+			"SpeedScale"	"0.3"
+			"VScript"	"4fun_drone_giant"
+		}
+	}
+	"HORDE_WANDERER" {
+		"SelectionWeight"	"0.75"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"3.2"
+			"HealthBonus"	"10000"
+			"SpeedScale"	"0.3"
+			"VScript"	"4fun_drone_giant"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_buzzer"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"npc_antlionguard_cavern"
+			"SizeScale"	"1.5"
+			"SpeedScale"	"0.6"
+			"VScript"	"4fun_antlion_boomer"			
+		}
+	}
+	"WANDERER" {
+		"SelectionWeight"	"0.75"
+		"NPC" {
+			"AlienClass"	"asw_queen"
+			"Flammable"	"0"
+			"Teslable"	"0"
+			"Flinches"	"0"
+			"VScript"	"4fun_queen.nut"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"Flammable"	"0"
+			"SizeScale"	"2.2"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"Flammable"	"0"
+			"SizeScale"	"2.2"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+	}	
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"Flammable"	"0"
+			"SizeScale"	"2.2"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"Flammable"	"0"
+			"SizeScale"	"2.2"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_mortarbug"
+			"SizeScale"	"1.8"
+			"Flinches"	"0"
+			"SpeedScale"	"0.3"
+			"HealthBonus"	"3000"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_harvester"
+			"SizeScale"	"2.2"
+			"Flinches"	"0"
+			"SpeedScale"	"-2"
+			"VScript"	"4fun_harvester.nut"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_boomer"
+			"SizeScale"	"1.4"
+			"Flinches"	"0"
+			"SpeedScale"	"2"
+			"VScript"	"4fun_antlion_boomer.nut"
+		}
+	}
+	"WANDERER+HORDE_WANDERER" {
+		"SelectionWeight"	"2"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"2.2"
+			"HealthBonus"	"3000"
+			"SpeedScale"	"0.5"
+			"Flinches"	"0"
+		}
+	}
+	"WANDERER" {
+		"SelectionWeight"	"20"
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"0.8"
+		}
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"0.9"
+		}
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"1.1"
+		}
+		"NPC" {
+			"AlienClass"	"asw_drone"
+			"SizeScale"	"0.7"
+		}
+	}
+	"PRESPAWN" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_shieldbug"
+			"SizeScale"	"1.3"
+			"Flinches"	"0"
+			"SpeedScale"	"2"
+			"VScript"	"4fun_shield.nut"
+		}
+	}
+	"PRESPAWN" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"npc_antlionguard_cavern"
+			"SizeScale"	"1.5"
+			"SpeedScale"	"0.6"
+			"Flammable"	"0"
+			"Flinches"	"0"
+			"VScript"	"4fun_antlion_boomer.nut"
+		}
+	}
+	"PACK" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_ranger"
+			"SizeScale"	"2"
+			"Flammable"	"0"
+			"Teslable"	"0"
+			"Flinches"	"0"
+			"VScript"	"4fun_ranger"
+		}
+		"NPC" {
+			"AlienClass"	"asw_ranger"
+			"SizeScale"	"2"
+			"Flammable"	"0"
+			"Teslable"	"0"
+			"Flinches"	"0"
+			"VScript"	"4fun_ranger"
+		}
+		"NPC" {
+			"AlienClass"	"asw_ranger"
+			"SizeScale"	"2"
+			"Flammable"	"0"
+			"Teslable"	"0"
+			"Flinches"	"0"
+			"VScript"	"4fun_ranger"
+		}
+	}
+	"PACK" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_mortarbug"
+			"SizeScale"	"1.8"
+			"SpeedScale"	"0.3"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+		"NPC" {
+			"AlienClass"	"asw_mortarbug"
+			"SizeScale"	"1.8"
+			"SpeedScale"	"0.3"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+		"NPC" {
+			"AlienClass"	"asw_mortarbug"
+			"SizeScale"	"1.8"
+			"SpeedScale"	"0.3"
+			"Flinches"	"0"
+			"HealthBonus"	"3000"
+		}
+	}
+	"PACK" {
+		"SelectionWeight"	"1"
+		"NPC" {
+			"AlienClass"	"asw_parasite"
+			"SizeScale"	"0.5"
+		}
+		"NPC" {
+			"AlienClass"	"asw_parasite"
+			"SizeScale"	"0.5"
+		}
+		"NPC" {
+			"AlienClass"	"asw_parasite"
+			"SizeScale"	"0.5"
+		}
+		"NPC" {
+			"AlienClass"	"asw_parasite"
+			"SizeScale"	"0.5"
+		}
+		"NPC" {
+			"AlienClass"	"asw_parasite"
+			"SizeScale"	"0.5"
+		}
+		"NPC" {
+			"AlienClass"	"asw_parasite"
+			"SizeScale"	"0.5"
+		}
+	}
+}
