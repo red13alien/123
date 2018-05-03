@@ -60,7 +60,7 @@ regenInterval <- {
 	asw_weapon_freeze_grenades=10
 	asw_weapon_railgun=0
 	asw_weapon_gas_grenades=0
-	asw_weapon_grenade_launcher=40
+	asw_weapon_grenade_launcher=0
 }
 
 ammoCount <- {
@@ -78,7 +78,7 @@ ammoCount <- {
 	asw_weapon_freeze_grenades=3
 	asw_weapon_railgun=1
 	asw_weapon_gas_grenades=3
-	asw_weapon_grenade_launcher=2
+	asw_weapon_grenade_launcher=1
 }
 
 regenDelay <- {
@@ -96,7 +96,7 @@ regenDelay <- {
 	asw_weapon_freeze_grenades=10
 	asw_weapon_railgun=40
 	asw_weapon_gas_grenades=50
-	asw_weapon_grenade_launcher=20
+	asw_weapon_grenade_launcher=30
 }
 
 damageTable <- {
@@ -338,6 +338,7 @@ target.PrecacheSoundScript("ASWInterface.MissionBoxes");
 target.PrecacheSoundScript("ASW_ElectrifiedSuit.Loop");
 target.PrecacheSoundScript("ASWInterface.SelectWeaponSlot");
 target.PrecacheSoundScript("Bounce.Concrete");
+target.PrecacheSoundScript("ASW_Weapon.BatteryCharged");
 target.PrecacheSoundScript("NPC_SScanner.Die");
 target.PrecacheSoundScript("NPC_SScanner.DeployMine");
 target.PrecacheSoundScript("Weapon_CombineGuard.Special1")
@@ -747,82 +748,6 @@ function InjectThink( scrEnt, thinkFunc ) //https://developer.valvesoftware.com/
 // InjectThink( myEnt, @() g_MapScript.InjectedThink(self))
 // or of course whatever function you want/local thing, etc
 
-function MoveForward()
-{
-	self.SetOrigin(self.GetOrigin() + self.GetForwardVector()*i);
-	i += 0.01;
-	
-	local hNearEnt = null;
-	while ( ( hNearEnt = Entities.FindInSphere( hNearEnt, self.GetOrigin(), 180 ) ) != null ){
-		if ( hNearEnt.IsAlien() || hNearEnt.GetClassname() == "prop_physics" )
-			hNearEnt.TakeDamage( 130, 256, null);
-	}
-	
-	local nearTarget = null;
-	if ( (TraceLine(self.GetOrigin(), self.GetOrigin() + self.GetForwardVector()*i, null) != 1)
-		|| ((nearTarget = Entities.FindByClassnameWithin(nearTarget, "asw_door", self.GetOrigin(), 20)) != null) ){
-		self.StopSound("ASW_Tesla_Laser.Loop");
-		self.EmitSound("ASW_Tesla_Laser.Stop");
-		DoEntFire("!self", "Kill", "", 0, null, self);
-	}
-	
-	return 0.01;
-}
-
-function FireballMoveForward()
-{
-	
-	function ParticleSpawn(killtime, x, y, z, who, effect, emit, follow)
-	{
-		local vector = who.GetOrigin();
-		local particle = Entities.CreateByClassname("info_particle_system");
-		particle.__KeyValueFromString("effect_name", effect);
-		particle.__KeyValueFromString("start_active", "1");
-		particle.SetOrigin(vector + Vector(x, y, z));
-		particle.Spawn();
-		if ( follow == 1 )
-			DoEntFire("!self", "SetParent", "!activator", 0, who, particle);
-		particle.Activate();
-		DoEntFire("!self", "Kill", "", killtime, null, particle);
-		if (emit != 0)
-			particle.EmitSound(emit);
-	}
-	
-	//self.SetOrigin(self.GetOrigin() + self.GetForwardVector()*2);
-	self.SetVelocity(self.GetForwardVector()*2000 + Vector(0,0,200));
-	
-	local hNearEnt = null;
-	while ( ( hNearEnt = Entities.FindInSphere( hNearEnt, self.GetOrigin(), 25 ) ) != null ){
-		if ( hNearEnt.IsAlien() ){
-			//ParticleSpawn(1, 0, 0, 30, self, "portal_ritf_flash_01c", 0, 0)
-			//ParticleSpawn(2, 0, 0, 10, self, "vindicator_grenade_warp", "explode_3", 0)
-			//ParticleSpawn(4, 0, 0, 30, self, "citadel_shockwave_b", "explode_2", 0)
-			local hNearEnt = null;
-			while ( ( hNearEnt = Entities.FindInSphere( hNearEnt, self.GetOrigin(), 900 ) ) != null ){
-				if ( hNearEnt.IsValid() )
-					hNearEnt.TakeDamage( 69999, 8, null);
-			}
-			EntFireByHandle(self, "Kill", "", 0, self, self);
-		}
-	}	
-	/*
-	local nearTarget = null;
-	if ( (TraceLine(self.GetOrigin(), self.GetOrigin() + self.GetForwardVector()*1.5, null) != 1) 
-		|| ((nearTarget = Entities.FindByClassnameWithin(nearTarget, "asw_door", self.GetOrigin(), 20)) != null) ){
-		ParticleSpawn(1, 0, 0, 30, self, "portal_ritf_flash_01c", 0, 0)
-		ParticleSpawn(2, 0, 0, 10, self, "vindicator_grenade_warp", "explode_3", 0)
-		ParticleSpawn(4, 0, 0, 30, self, "citadel_shockwave_b", "explode_2", 0)
-		local hNearEnt = null;
-		while ( ( hNearEnt = Entities.FindInSphere( hNearEnt, self.GetOrigin(), 900 ) ) != null ){
-			if ( hNearEnt.IsAlien() )
-				hNearEnt.TakeDamage( 69999, 8, null);
-		}
-		EntFireByHandle(self, "Kill", "", 0, self, self);
-	}
-	return 0.01;
-	*/
-}
-
 //------------------------------------------------------|
 //------------- Damage filter for doors ----------------|
 //------------------------------------------------------|
@@ -837,73 +762,328 @@ while ( ( door = Entities.FindByClassname( door, "asw_door" ) ) != null )
 	DoEntFire("!self", "SetDamageFilter", "filter", 0, null, door);
 //------------------------------------------------------|
 
+//Bfg
+function MoveForward(){
+	self.SetOrigin(self.GetOrigin() + self.GetForwardVector()*i);
+	i += 0.01;
+	
+	local hNearEnt = null;
+	while ( ( hNearEnt = Entities.FindInSphere( hNearEnt, self.GetOrigin(), 180 ) ) != null ){
+		if ( hNearEnt.IsAlien() || hNearEnt.GetClassname() == "prop_physics" )
+			hNearEnt.TakeDamage( 130, 256, null);
+	}
+	
+	local nearTarget = null;
+	if ( (TraceLine(self.GetOrigin(), self.GetOrigin() + self.GetForwardVector()*i, null) != 1)
+		|| ((nearTarget = Entities.FindByClassnameWithin(nearTarget, "asw_door", self.GetOrigin(), 1)) != null) ){
+		self.StopSound("ASW_Tesla_Laser.Loop");
+		self.EmitSound("ASW_Tesla_Laser.Stop");
+		DoEntFire("!self", "Kill", "", 0, null, self);
+	}
+	
+	return 0.01;
+}
+
+function DestroyerTwo()
+{
+	if (smokeTrailspawned && smokeTrail != null && smokeTrail.IsValid())
+		smokeTrail.Destroy();
+	if (self != null && self.IsValid()){
+		self.DisconnectOutput("OnTimer", "BfgReload");
+		self.Destroy();
+	}
+}
+
+function smokeTrailSetOrigin()
+{
+	if (self != null && self.IsValid()){
+		self.SetLocalOrigin(Vector(9,0,2));
+		self.SetLocalAngles(-90,0,0);
+		self.DisconnectOutput("OnUser1", "smokeTrailSetOrigin");
+	}
+}
+
+function BfgReload()
+{
+	if (weapon != null && weapon.IsValid() && weapon.Clip1() == 0){
+		local marine = weapon.GetOwner();
+		if (marine != null && marine.IsValid()){
+			local hActiveWeapon = NetProps.GetPropEntity( marine, "m_hActiveWeapon" );
+			if (hActiveWeapon && hActiveWeapon == weapon){
+				weapon.EmitSound("ASWComputer.TimeOut");
+				marine.EmitSound("ASWComputer.NumberAligned");
+				
+				if (!smokeTrailspawned){
+					smokeTrail = Entities.CreateByClassname("info_particle_system");
+					smokeTrail.__KeyValueFromString("effect_name", "jumpjet_smoke_trail");
+					smokeTrail.__KeyValueFromString("start_active", "1");
+					smokeTrail.Spawn();
+					smokeTrail.Activate();
+					smokeTrail.ValidateScriptScope();
+					smokeTrail.GetScriptScope().smokeTrailSetOrigin <- smokeTrailSetOrigin;
+					smokeTrail.ConnectOutput("OnUser1", "smokeTrailSetOrigin");
+					DoEntFire("!self", "SetParent", "!activator", 0, weapon, smokeTrail);
+					DoEntFire("!self", "SetParentAttachment", "muzzle", 0, weapon, smokeTrail);
+					EntFireByHandle(smokeTrail, "FireUser1", "", 0, self, self);
+					smokeTrailspawned = true;
+				}
+				
+				if (weaponTime + 9 < Time()){
+					weapon.SetClip1(1);
+					weapon.EmitSound("ASW_Rifle.ReloadC");
+					DestroyerTwo();
+				}
+				
+			} else {
+				weaponTime = Time();
+				if (smokeTrailspawned){
+					smokeTrail.Destroy();
+					smokeTrailspawned = false;
+				}
+			}
+		} else DestroyerTwo();
+	} else DestroyerTwo();
+}
+
+function BfgRecharging(weapon, delay)
+{
+	local timer = Entities.CreateByClassname("logic_timer");
+	timer.__KeyValueFromFloat("RefireTime", 0.3);
+	DoEntFire("!self", "Disable", "", 0, null, timer);
+	timer.ValidateScriptScope();
+	local timerScope = timer.GetScriptScope();
+	timerScope.weapon <- weapon;
+	timerScope.weaponTime <- Time();
+	timerScope.smokeTrail <- null;
+	timerScope.smokeTrailspawned <- false;
+	timerScope.BfgReload <- BfgReload;
+	timerScope.smokeTrailSetOrigin <- smokeTrailSetOrigin;
+	timerScope.DestroyerTwo <- DestroyerTwo;
+	timer.ConnectOutput("OnTimer", "BfgReload");
+	DoEntFire("!self", "Enable", "", delay, null, timer);
+}
+
+function StopLoop()
+{
+	self.StopSound("ASW_Tesla_Laser.Loop");
+	self.EmitSound("ASW_Tesla_Laser.Stop");
+	self.DisconnectOutput("OnUser1", "StopLoop");
+	DoEntFire("!self", "Kill", "", 0, null, self);
+}
+
+function Point2SetLocalOrigin()
+{
+	if (self != null && self.IsValid()){
+		self.SetOrigin(point1.GetOrigin());
+		self.SetForwardVector(point1.GetForwardVector());
+		self.SetLocalOrigin(Vector(60,-3,0));
+		self.DisconnectOutput("OnUser1", "Point2SetLocalOrigin");
+	}
+}
+
+function BfgShot()
+{
+	local marine = self.GetOwner();
+	if (marine != null && marine.IsValid()){
+		local hActiveWeapon = NetProps.GetPropEntity( marine, "m_hActiveWeapon" );
+		if ((!hActiveWeapon) || (hActiveWeapon != self))
+			return;
+	} else return;		
+	
+	local particle = Entities.CreateByClassname("info_particle_system");
+	particle.__KeyValueFromString("effect_name", "stungrenade_core_copy");
+	particle.__KeyValueFromString("start_active", "1");
+	local VecBfg = point2.GetOrigin() - point1.GetOrigin();
+	/*
+	printl("________________________");
+	printl("point1: " + point1.GetOrigin().z);
+	printl("point2: " + point2.GetOrigin().z);
+	printl("point1 - point2: " + (point1.GetOrigin().z - point2.GetOrigin().z));
+	printl("^^^^^^^^^^^^^^^^^^^^^^^^");
+	*/
+	VecBfg = VecBfg * (1/VecBfg.Length());
+	VecBfg = Vector(VecBfg.x, VecBfg.y, 0);
+	particle.SetForwardVector(VecBfg);
+	particle.SetOrigin(self.GetOrigin() + self.GetForwardVector()*50 + Vector(0, 0, 50));
+	particle.Spawn();
+	particle.Activate();
+	particle.EmitSound("ASW_Tesla_Laser.Loop");
+	particle.ValidateScriptScope();
+	local particleScope = particle.GetScriptScope();
+	particleScope.i <- 1.0;
+	particleScope.StopLoop <- StopLoop;
+	particle.ConnectOutput("OnUser1", "StopLoop");
+	InjectThink( particle, MoveForward );
+	EntFireByHandle(particle, "FireUser1", "", 8, self, self);
+	
+	local particleStartFire = Entities.CreateByClassname("info_particle_system");
+	particleStartFire.__KeyValueFromString("effect_name", "vindicator_grenade_warp");
+	particleStartFire.__KeyValueFromString("start_active", "1");
+	particleStartFire.SetOrigin(particle.GetOrigin());
+	particleStartFire.Spawn();
+	particleStartFire.Activate();
+	particleStartFire.EmitSound("Weapon_CombineGuard.Special1");
+	marine.EmitSound("NPC_SScanner.DeployMine");
+	local target = Entities.CreateByClassname("info_target");
+	target.SetOrigin(self.GetOrigin());
+	target.EmitSound("NPC_SScanner.Die");
+	DoEntFire("!self", "Kill", "", 2, null, target);
+	target = Entities.CreateByClassname("info_target");
+	target.SetOrigin(self.GetOrigin());
+	target.EmitSound("NPC_SScanner.Die");
+	DoEntFire("!self", "Kill", "", 2, null, target);
+	DoEntFire("!self", "Kill", "", 1, null, particleStartFire);
+}
+
+function BfgStartShooting()
+{
+	local marine = weapon.GetOwner();
+	
+	if (i < 1.1)
+		i += 0.2;
+	else DestroyerOne();
+	
+	if (weapon != null && weapon.IsValid()){
+		local marine = weapon.GetOwner();
+		if (marine != null && marine.IsValid()){
+			local hActiveWeapon = NetProps.GetPropEntity( marine, "m_hActiveWeapon" );
+			if (!hActiveWeapon || hActiveWeapon != weapon)
+				DestroyerOne();
+		} else DestroyerOne();
+	} else DestroyerOne();
+}
+
+function DestroyerOne()
+{
+	if (particle != null && particle.IsValid())
+		particle.Destroy();
+	if (self != null && self.IsValid()){
+		self.DisconnectOutput("OnTimer", "BfgStartShooting");
+		self.Destroy();
+	}
+}
+
+function EntSetLocalOrigin()
+{
+	if (self != null && self.IsValid()){
+		self.SetLocalOrigin(Vector(7,0,3));
+		self.DisconnectOutput("OnUser1", "EntSetLocalOrigin");
+	}
+}
+
+function OnGameEvent_item_pickup(params)
+{
+	local weapon = EntIndexToHScript( params["entindex"] );
+	if ( weapon.GetClassname() == "asw_weapon_grenade_launcher" && weapon.Clip1() == 0 )
+		BfgRecharging(weapon, 0);
+}
+
 function OnGameEvent_weapon_fire(params)
 {
 	local weapon = EntIndexToHScript( params["weapon"] );
 	local marine = EntIndexToHScript( params["marine"] );
 	if (weapon.GetClassname() == "asw_weapon_grenade_launcher"){
-		marine.StopSound("ASW_GrenadeLauncher.Fire");
-		marine.StopSound("ASW_GrenadeLauncher.FireFP");
-		weapon.EmitSound("NPC_SScanner.DeployMine");
+		//marine.StopSound("ASW_GrenadeLauncher.Fire");
+		//marine.StopSound("ASW_GrenadeLauncher.FireFP");
+
+		local point1 = Entities.CreateByClassname("info_target");
+		point1.SetForwardVector(weapon.GetForwardVector());
+		DoEntFire("!self", "SetParent", "!activator", 0, weapon, point1);
+		DoEntFire("!self", "SetParentAttachment", "muzzle", 0, weapon, point1);
+		point1.ValidateScriptScope();
+		point1.GetScriptScope().EntSetLocalOrigin <- EntSetLocalOrigin;
+		point1.ConnectOutput("OnUser1", "EntSetLocalOrigin");
+		EntFireByHandle(point1, "FireUser1", "", 0, self, self);
+		DoEntFire("!self", "Kill", "", 2, null, point1);
+		
+		local point2 = Entities.CreateByClassname("info_target");
+		DoEntFire("!self", "SetParent", "!activator", 0, point1, point2);
+		point2.ValidateScriptScope();
+		local point2Scope = point2.GetScriptScope();
+		point2Scope.Point2SetLocalOrigin <- Point2SetLocalOrigin;
+		point2Scope.point1 <- point1;
+		point2.ConnectOutput("OnUser1", "Point2SetLocalOrigin");		
+		EntFireByHandle(point2, "FireUser1", "", 0, self, self);
+		DoEntFire("!self", "Kill", "", 2, null, point2);
+		
+		weapon.EmitSound("Weapon_CombineGuard.Special1");
+		weapon.ValidateScriptScope();
+		local weaponScope = weapon.GetScriptScope();
+		weaponScope.BfgShot <- BfgShot;
+		weaponScope.point1 <- point1;
+		weaponScope.point2 <- point2;
+		weaponScope.StopLoop <- StopLoop;
+		weaponScope.InjectThink <- InjectThink;
+		weaponScope.MoveForward <- MoveForward;
+		weapon.ConnectOutput("OnUser1", "BfgShot");
+		EntFireByHandle(weapon, "FireUser1", "", 1.02, self, self);
+
+		local muzzleGlow = Entities.CreateByClassname("info_particle_system");
+		muzzleGlow.__KeyValueFromString("effect_name", "electrified_armor_burst2"); //didnt find something glowing :/
+		muzzleGlow.__KeyValueFromString("start_active", "1");
+		muzzleGlow.Spawn();
+		muzzleGlow.Activate();
+		muzzleGlow.ValidateScriptScope();
+		muzzleGlow.GetScriptScope().EntSetLocalOrigin <- EntSetLocalOrigin;
+		muzzleGlow.ConnectOutput("OnUser1", "EntSetLocalOrigin");
+		DoEntFire("!self", "SetParent", "!activator", 0, weapon, muzzleGlow);
+		DoEntFire("!self", "SetParentAttachment", "muzzle", 0, weapon, muzzleGlow);
+		EntFireByHandle(muzzleGlow, "FireUser1", "", 0, self, self);
+		DoEntFire("!self", "Kill", "", 1, null, muzzleGlow);
 		
 		local particle = Entities.CreateByClassname("info_particle_system");
-		particle.__KeyValueFromString("effect_name", "stungrenade_core_copy");
+		particle.__KeyValueFromString("effect_name", "electric_weapon_zap_muzzle"); //Bfg ball
 		particle.__KeyValueFromString("start_active", "1");
-		particle.SetOrigin(weapon.GetOrigin() + weapon.GetForwardVector()*50 + Vector(0, 0, 50));
-
-		local player = null;
-		local VecCrosshairOrigin = null;
-		while((player = Entities.FindByClassname(player, "player")) != null ){
-			local m_hMarine = NetProps.GetPropEntity(player, "m_hMarine");
-			if (m_hMarine != null && m_hMarine.GetMarineName() == marine.GetMarineName())
-				VecCrosshairOrigin = NetProps.GetPropVector(player, "m_vecCrosshairTracePos");
-		}
-
-		if (VecCrosshairOrigin != null && (VecCrosshairOrigin.x != 0 || VecCrosshairOrigin.y != 0)){
-			local VecBfg = VecCrosshairOrigin - marine.GetOrigin();
-			VecBfg = VecBfg * (1/VecBfg.Length());
-			VecBfg = Vector(VecBfg.x, VecBfg.y, 0);
-			particle.SetForwardVector(VecBfg);
-		} else particle.SetForwardVector(marine.GetForwardVector());
-
 		particle.Spawn();
 		particle.Activate();
-		particle.EmitSound("ASW_Tesla_Laser.Loop");
 		particle.ValidateScriptScope();
-		local particleScope = particle.GetScriptScope();
-		local i = 1.0;
-		particleScope.i <- i;
-		InjectThink( particle, MoveForward );
+		particle.GetScriptScope().EntSetLocalOrigin <- EntSetLocalOrigin;
+		particle.ConnectOutput("OnUser1", "EntSetLocalOrigin");
+		DoEntFire("!self", "SetParent", "!activator", 0, weapon, particle);
+		DoEntFire("!self", "SetParentAttachment", "muzzle", 0, weapon, particle);
+		EntFireByHandle(particle, "FireUser1", "", 0, self, self);
 		
-		function StopLoop(){
-			self.StopSound("ASW_Tesla_Laser.Loop");
-			self.EmitSound("ASW_Tesla_Laser.Stop");
-			self.DisconnectOutput("OnUser1", "StopLoop");
-			DoEntFire("!self", "Kill", "", 0, null, self);
-		}
-		particle.ValidateScriptScope();
-		particle.GetScriptScope().StopLoop <- StopLoop;
-		particle.ConnectOutput("OnUser1", "StopLoop");
-		EntFireByHandle(particle, "FireUser1", "", 8, self, self);
+		local timer = Entities.CreateByClassname("logic_timer");
+		timer.__KeyValueFromFloat("RefireTime", 0.2);
+		DoEntFire("!self", "Disable", "", 0, null, timer);
+		timer.ValidateScriptScope();
+		local timerScope = timer.GetScriptScope();
+		timerScope.weapon <- weapon;
+		timerScope.i <- 0;
+		timerScope.particle <- particle;
+		timerScope.DestroyerOne <- DestroyerOne;
+		timerScope.BfgStartShooting <- BfgStartShooting;
+		timer.ConnectOutput("OnTimer", "BfgStartShooting");
+		DoEntFire("!self", "Enable", "", 0, null, timer);
 		
-		local particleStartFire = Entities.CreateByClassname("info_particle_system");
-		particleStartFire.__KeyValueFromString("effect_name", "vindicator_grenade_warp");
-		particleStartFire.__KeyValueFromString("start_active", "1");
-		particleStartFire.SetOrigin(particle.GetOrigin());
-		particleStartFire.Spawn();
-		particleStartFire.Activate();
-		particleStartFire.EmitSound("Weapon_CombineGuard.Special1");
-		marine.EmitSound("NPC_SScanner.DeployMine");
-		local target = Entities.CreateByClassname("info_target");
-		target.SetOrigin(weapon.GetOrigin());
-		target.EmitSound("NPC_SScanner.Die");
-		DoEntFire("!self", "Kill", "", 2, null, target);
-		target = Entities.CreateByClassname("info_target");
-		target.SetOrigin(weapon.GetOrigin());
-		target.EmitSound("NPC_SScanner.Die");
-		DoEntFire("!self", "Kill", "", 2, null, target);
-		DoEntFire("!self", "Kill", "", 1, null, particleStartFire);
+		BfgRecharging(weapon, 1.02);
 	}
+}
+//Bfg end
+function createParabola(point1, point2) {
+	local p2 = point2 - point1;
+	p2 = Vector(Vector(p2.x, p2.y, 0).Length(), p2.z, 0);
+	local p3 = Vector(p2.x * 0.99, p2.y + p2.x * 0.01, 0); //point between start and end
+	
+	local f2 = Vector(pow(p2.x, 2), p2.x, p2.y);
+	local f3 = Vector(pow(p3.x, 2), p3.x, p3.y);
+	
+	f3 *= 1 / f3.y;
+	f2 -= f3 * f2.y;
+	local a = f2.z / f2.x;
+	local b = (f3.z - f3.x * a) / f3.y;
+	
+	return function(x, y, a = a, b = b) {
+		if (x == null && y == null) {
+			throw "At least one coordinate should be specified";
+		} else if (y == null) {
+			return -(a * pow(x, 2) - b * x);
+		} else if (x == null) {
+			return b / a;
+		} else {
+			return y == a * pow(x, 2) - b * x;
+		}
+	};
 }
 
 function OnGameEvent_weapon_offhand_activate(params)
@@ -952,25 +1132,130 @@ function OnGameEvent_weapon_offhand_activate(params)
 
 		local dirYaw = null;
 		local force = 0;
+		local marinePos = marine.GetOrigin();
+		local gravity = 800.0;
+		local vAngle = 0;
+		printl(VecCrosshairOrigin);
 		if (VecCrosshairOrigin != null && (VecCrosshairOrigin.x != 0 || VecCrosshairOrigin.y != 0)){
-			local VecPush = VecCrosshairOrigin - marine.GetOrigin();
+		
+			local parabola = createParabola(marinePos, VecCrosshairOrigin);
+			local distance = abs(parabola(null, 0));
+			
+			local VecPush = Vector(VecCrosshairOrigin.x, VecCrosshairOrigin.y, 0) - Vector(marinePos.x, marinePos.y, 0);
+			VecPush = VecPush * (1/VecPush.Length());
+			dirYaw = acos(VecPush.x)*180/PI;
+			if (VecPush.y < 0)
+				dirYaw = -dirYaw;
+			
+			vAngle = atan(abs(parabola(distance / 2.0, null)) / (distance / 2.0)) * 180 / PI;
+			local v0 =  sqrt(distance * gravity / sin(sin((vAngle * PI) / 90.0)));
+			force = abs(v0 * 6 * 50);
+			
+			printl("distance=" + distance);
+			printl("ad=" + (VecCrosshairOrigin - marinePos).Length());
+			printl("vAngle=" + vAngle);
+			printl("dirYaw=" + dirYaw);
+			printl("force=" + force);
+			
+			/*
 			local timeLet = VecPush.Length();
 			timeLet = (timeLet*2)/1000;
 			VecPush = VecPush * (1/VecPush.Length());
-			printl(timeLet);
+			//printl(timeLet);
+			//printl(dirYaw);
+			local time = timeLet;
+			VecCrosshairOrigin = Vector(VecCrosshairOrigin.x, VecCrosshairOrigin.y, marinePos.z);
+			local VelocityVector = (VecCrosshairOrigin - marinePos - Vector(0, 0, -gravity*time*time/2)) * (1/time.tofloat());
+			VelocityVector = VelocityVector.Length();
+			//printl(time);
+			force = VelocityVector * 50/time;
+			//force *= 4.9;
+			//printl(force);
+			*/
+		} else {
+			vAngle = -50.0;
+			dirYaw = marine.GetAngles().y;
+			force = 190000;
+		}
+		
+		local thruster = Entities.CreateByClassname("phys_thruster");
+		thruster.__KeyValueFromString("attach1", mainPropName);
+		thruster.__KeyValueFromString("force", force.tostring());
+		thruster.__KeyValueFromString("forcetime", "0.1");
+		thruster.__KeyValueFromString("spawnflags", "11");
+		thruster.__KeyValueFromString("angles", (-vAngle).tostring() + " " + dirYaw.tostring() + " 0"); //marine.GetAngles().y.tostring()
+		thruster.SetOrigin(mainProp.GetOrigin());
+		thruster.Spawn();
+		thruster.Activate();
+		thruster.SetLocalAngles(0, 0, 0);
+		DoEntFire("!self", "Activate", "", 0, null, thruster);
+		DoEntFire("!self", "Kill", "", 2, null, thruster);
+	}
+}
+
+/*
+function OnGameEvent_weapon_offhand_activate(params)
+{
+	local weapon = EntIndexToHScript( params["weapon"] );
+	local marine = EntIndexToHScript( params["marine"] );
+	if (weapon.GetClassname() == "asw_weapon_grenades"){
+		local mainProp = Entities.CreateByClassname("prop_physics_override");
+		local mainPropName = UniqueString();
+		mainProp.__KeyValueFromString("model", "models/items/personalmedkit/personalmedkit.mdl"); //models/items/personalmedkit/personalmedkit.mdl, models/gibs/antlion_gib_large_3.mdl, models/aliens/drone_gibs/gib_upper_arm.mdl
+		mainProp.__KeyValueFromString("overridescript", "mass,50");
+		mainProp.__KeyValueFromString("rendermode", "10");
+		mainProp.__KeyValueFromString("targetname", mainPropName);
+		mainProp.SetOrigin(marine.GetOrigin() + marine.GetForwardVector()*30 + Vector(0, 0, 60));
+		mainProp.Spawn();
+		mainProp.Activate();
+		mainProp.SetSize( Vector(-1,-1,0), Vector(1,1,1));
+		mainProp.SetCollisionGroup(1);
+		mainProp.SetForwardVector(marine.GetForwardVector());
+
+		local visualProp = Entities.CreateByClassname("prop_dynamic");
+		visualProp.__KeyValueFromString("model", "models/swarm/grenades/handgrenadeprojectile.mdl");
+		visualProp.SetOrigin(mainProp.GetOrigin());
+		DoEntFire("!self", "SetParent", "!activator", 0,  mainProp, visualProp);
+		visualProp.Spawn();
+		visualProp.Activate();
+		visualProp.SetSize( Vector(-1,-1,0), Vector(1,1,1));
+		visualProp.SetCollisionGroup(1);
+		visualProp.SetForwardVector(marine.GetForwardVector());
+		
+		local particle = Entities.CreateByClassname("info_particle_system");
+		particle.__KeyValueFromString("effect_name", "rifle_grenade_fx");
+		particle.__KeyValueFromString("start_active", "1");
+		particle.SetOrigin(visualProp.GetOrigin());
+		particle.Spawn();
+		particle.Activate();
+		DoEntFire("!self", "SetParent", "!activator", 0, visualProp, particle);	
+		
+		local player = null;
+		local VecCrosshairOrigin = null;
+		while((player = Entities.FindByClassname(player, "player")) != null ){
+			local m_hMarine = NetProps.GetPropEntity(player, "m_hMarine");
+			if (m_hMarine != null && m_hMarine == marine)
+				VecCrosshairOrigin = NetProps.GetPropVector(player, "m_vecCrosshairTracePos");
+		}
+
+		local dirYaw = null;
+		local force = 0;
+		if (VecCrosshairOrigin != null && (VecCrosshairOrigin.x != 0 || VecCrosshairOrigin.y != 0)){
+			local VecPush = VecCrosshairOrigin - marine.GetOrigin();
+			VecPush = VecPush * (1/VecPush.Length());
 			dirYaw = acos(VecPush.x)*180/PI;
 			if (VecPush.y < 0)
 				dirYaw = -dirYaw;
 			//printl(dirYaw);
 			local gravity = 800;
-			local time = timeLet;
+			local time = 1;
 			local marinePos = marine.GetOrigin();
 			VecCrosshairOrigin = Vector(VecCrosshairOrigin.x, VecCrosshairOrigin.y, marinePos.z);
 			local VelocityVector = (VecCrosshairOrigin - marinePos - Vector(0, 0, -gravity*time*time/2)) * (1/time.tofloat());
 			VelocityVector = VelocityVector.Length();
 			//printl(VelocityVector);
 			force = VelocityVector * 50/time;
-			//force *= 4.9;
+			force *= 4.9;
 			printl(force);
 		} else {
 			dirYaw = marine.GetAngles().y;
@@ -991,7 +1276,7 @@ function OnGameEvent_weapon_offhand_activate(params)
 		DoEntFire("!self", "Kill", "", 2, null, thruster);
 	}
 }
-
+*/
 function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, damageType, ammoName )
 {
 	if (victim != null && victim.GetClassname() == "asw_marine" && attacker != null && attacker.IsAlien()){
@@ -1094,7 +1379,8 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 					if ( victim != null && victim.GetClassname() != "asw_marine"){
 						local A = attacker.GetOrigin();
 						local B = victim.GetOrigin();
-						local fDistance = sqrt( (A.x - B.x) * (A.x - B.x) + (A.y - B.y) * (A.y - B.y) + (A.z - B.z) * (A.z - B.z) );
+						local fDistance = (A - B).Length();
+						//printl(fDistance);
 						local iDmg = 5;
 						
 						if ( fDistance >= 400.0 && (!timeforexplosion.rawin(attacker) || timeforexplosion[attacker] + 0.3 < Time()) ){
@@ -1463,7 +1749,10 @@ function Update()
 		}
 		
         for (local weapon = marine.FirstMoveChild(); weapon != null; weapon = weapon.NextMovePeer()){
-			if (weapon.GetClassname() == "asw_weapon_railgun"){
+			if (weapon.GetClassname() == "asw_weapon_grenade_launcher"){
+				if ( weapon.Clip1() > 1 )
+					weapon.SetClip1( 1 );
+			} else if (weapon.GetClassname() == "asw_weapon_railgun"){
 				if ( weapon.GetClips() < 1 )
 					weapon.SetClips( 1 );
 			} else if (weapon.GetClassname() == "asw_weapon_normal_armor")
