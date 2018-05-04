@@ -561,7 +561,7 @@ function OnGameEvent_damage_amplifier_placed(params)
 	}
 	
 	if ( c.GetMarineName() == "Bastille" || c.GetMarineName() == "Faith" ){
-		marine <- null;
+		local marine = null;
 		while ( ( marine = Entities.FindByClassname( marine, "asw_marine" ) ) != null ){
 			marine.CureInfestation();
 			marine.SetHealth(marine.GetMaxHealth());
@@ -609,10 +609,23 @@ function OnGameEvent_damage_amplifier_placed(params)
 
 function OnGameEvent_heal_beacon_placed(params)
 {
-	local d = EntIndexToHScript( params["entindex"] );
-	local vector = d.GetOrigin();
-	PlaceHealBeacon( 9999, 9999, -9999, 30, 300, vector );
-	d.Destroy();
+	local hOldBeacon = EntIndexToHScript( params["entindex"] );
+	local marine = EntIndexToHScript( params["marine"] );
+	local marine = hOldBeacon.GetOwner();
+	local hHealBeacon = PlaceHealBeacon( 9999, 6, 0, 30, 200, hOldBeacon.GetOrigin() );
+	local player = null;
+	local VecCrosshairOrigin = null;
+	while((player = Entities.FindByClassname(player, "player")) != null ){
+		local m_hMarine = NetProps.GetPropEntity(player, "m_hMarine");
+		if (m_hMarine != null && m_hMarine == marine)
+			VecCrosshairOrigin = NetProps.GetPropVector(player, "m_vecCrosshairTracePos");
+	}
+
+	local marinePos = marine.GetOrigin();
+	local gravity = 800.0;
+	local flightTime = 0.0;
+	hHealBeacon.SetVelocity(LaunchVector(marinePos, VecCrosshairOrigin, gravity, flightTime));
+	hOldBeacon.Destroy();
 }
 
 function OnMissionStart()
@@ -639,6 +652,7 @@ function OnMissionStart()
 	DoEntFire("!self", "Enable", "", 0, null, timer);
 }
 
+//spawn
 function SpawnChanger(AName, AClass)
 {
 	local alien = null;
@@ -711,7 +725,9 @@ while((spawning = Entities.FindByClassname(spawning, "asw_spawner")) != null){
 	if (GetMapName() == "rd-lan2_sewer")
 		SpawnerChanger("5", 0, "1600", "0.3", 1, 2.1, 2.6 );
 }
+//spawn end
 
+//chainsaw
 function InjectThinkToSaw( scrEnt, attacker )
 {
 	scrEnt.ValidateScriptScope();
@@ -736,6 +752,13 @@ function InjectThinkToSaw( scrEnt, attacker )
 	}
 	AddThinkToEnt( scrEnt, "PitchSaw" );
 }
+
+function ChainsawPos()
+{
+	self.SetLocalOrigin(Vector(120, 0, 40));
+	self.DisconnectOutput("OnUser1", "ChainsawPos");
+}
+//chainsaw end
 
 function InjectThink( scrEnt, thinkFunc ) //https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_Functions
 {
@@ -763,14 +786,15 @@ while ( ( door = Entities.FindByClassname( door, "asw_door" ) ) != null )
 //------------------------------------------------------|
 
 //Bfg
-function MoveForward(){
+function MoveForward()
+{
 	self.SetOrigin(self.GetOrigin() + self.GetForwardVector()*i);
 	i += 0.01;
 	
 	local hNearEnt = null;
 	while ( ( hNearEnt = Entities.FindInSphere( hNearEnt, self.GetOrigin(), 180 ) ) != null ){
 		if ( hNearEnt.IsAlien() || hNearEnt.GetClassname() == "prop_physics" )
-			hNearEnt.TakeDamage( 130, 256, null);
+			hNearEnt.TakeDamage( 130, 256, attacker);
 	}
 	
 	local nearTarget = null;
@@ -782,6 +806,16 @@ function MoveForward(){
 	}
 	
 	return 0.01;
+}
+
+function DestroyerOne()
+{
+	if (particle != null && particle.IsValid())
+		particle.Destroy();
+	if (self != null && self.IsValid()){
+		self.DisconnectOutput("OnTimer", "BfgStartShooting");
+		self.Destroy();
+	}
 }
 
 function DestroyerTwo()
@@ -894,13 +928,6 @@ function BfgShot()
 	particle.__KeyValueFromString("effect_name", "stungrenade_core_copy");
 	particle.__KeyValueFromString("start_active", "1");
 	local VecBfg = point2.GetOrigin() - point1.GetOrigin();
-	/*
-	printl("________________________");
-	printl("point1: " + point1.GetOrigin().z);
-	printl("point2: " + point2.GetOrigin().z);
-	printl("point1 - point2: " + (point1.GetOrigin().z - point2.GetOrigin().z));
-	printl("^^^^^^^^^^^^^^^^^^^^^^^^");
-	*/
 	VecBfg = VecBfg * (1/VecBfg.Length());
 	VecBfg = Vector(VecBfg.x, VecBfg.y, 0);
 	particle.SetForwardVector(VecBfg);
@@ -911,6 +938,7 @@ function BfgShot()
 	particle.ValidateScriptScope();
 	local particleScope = particle.GetScriptScope();
 	particleScope.i <- 1.0;
+	particleScope.attacker <- marine;
 	particleScope.StopLoop <- StopLoop;
 	particle.ConnectOutput("OnUser1", "StopLoop");
 	InjectThink( particle, MoveForward );
@@ -923,7 +951,9 @@ function BfgShot()
 	particleStartFire.Spawn();
 	particleStartFire.Activate();
 	particleStartFire.EmitSound("Weapon_CombineGuard.Special1");
+	
 	marine.EmitSound("NPC_SScanner.DeployMine");
+	
 	local target = Entities.CreateByClassname("info_target");
 	target.SetOrigin(self.GetOrigin());
 	target.EmitSound("NPC_SScanner.Die");
@@ -951,16 +981,6 @@ function BfgStartShooting()
 				DestroyerOne();
 		} else DestroyerOne();
 	} else DestroyerOne();
-}
-
-function DestroyerOne()
-{
-	if (particle != null && particle.IsValid())
-		particle.Destroy();
-	if (self != null && self.IsValid()){
-		self.DisconnectOutput("OnTimer", "BfgStartShooting");
-		self.Destroy();
-	}
 }
 
 function EntSetLocalOrigin()
@@ -1060,30 +1080,37 @@ function OnGameEvent_weapon_fire(params)
 	}
 }
 //Bfg end
-function createParabola(point1, point2) {
-	local p2 = point2 - point1;
-	p2 = Vector(Vector(p2.x, p2.y, 0).Length(), p2.z, 0);
-	local p3 = Vector(p2.x * 0.99, p2.y + p2.x * 0.01, 0); //point between start and end
-	
-	local f2 = Vector(pow(p2.x, 2), p2.x, p2.y);
-	local f3 = Vector(pow(p3.x, 2), p3.x, p3.y);
-	
-	f3 *= 1 / f3.y;
-	f2 -= f3 * f2.y;
-	local a = f2.z / f2.x;
-	local b = (f3.z - f3.x * a) / f3.y;
-	
-	return function(x, y, a = a, b = b) {
-		if (x == null && y == null) {
-			throw "At least one coordinate should be specified";
-		} else if (y == null) {
-			return -(a * pow(x, 2) - b * x);
-		} else if (x == null) {
-			return b / a;
-		} else {
-			return y == a * pow(x, 2) - b * x;
-		}
-	};
+
+//grenade cluster
+function max(One, Two)
+{
+	if (One > Two)
+		return One;
+	return Two;
+}
+
+function LaunchVector( src, dest, gravity, flightTime )
+{
+	if ( flightTime == 0.0 )
+	{
+		flightTime = max( 0.8, sqrt( ( (dest - src).Length() * 1.5 ) / gravity ) );
+	}
+
+	// delta high from start to end
+	local H = dest.z - src.z ; 
+	// azimuth vector
+	local azimuth = dest-src;
+	azimuth.z = 0;
+	// get horizontal distance start to end
+	local D = azimuth.Length();
+	// normalize azimuth
+	azimuth *= 1/D;
+
+	local Vy = ( H / flightTime + 0.5 * gravity * flightTime );
+	local Vx = ( D / flightTime );
+	local ret = azimuth * Vx;
+	ret.z = Vy;
+	return ret;
 }
 
 function OnGameEvent_weapon_offhand_activate(params)
@@ -1091,36 +1118,14 @@ function OnGameEvent_weapon_offhand_activate(params)
 	local weapon = EntIndexToHScript( params["weapon"] );
 	local marine = EntIndexToHScript( params["marine"] );
 	if (weapon.GetClassname() == "asw_weapon_grenades"){
-		local mainProp = Entities.CreateByClassname("prop_physics_override");
-		local mainPropName = UniqueString();
-		mainProp.__KeyValueFromString("model", "models/aliens/drone_gibs/gib_upper_arm.mdl"); //models/gibs/antlion_gib_large_3.mdl
-		mainProp.__KeyValueFromString("overridescript", "mass,50");
-		mainProp.__KeyValueFromString("rendermode", "10");
-		mainProp.__KeyValueFromString("targetname", mainPropName);
-		mainProp.SetOrigin(marine.GetOrigin() + marine.GetForwardVector()*30 + Vector(0, 0, 60));
-		mainProp.Spawn();
-		mainProp.Activate();
-		mainProp.SetSize( Vector(-1,-1,0), Vector(1,1,1));
-		mainProp.SetCollisionGroup(1);
-		mainProp.SetForwardVector(marine.GetForwardVector());
-
-		local visualProp = Entities.CreateByClassname("prop_dynamic");
-		visualProp.__KeyValueFromString("model", "models/swarm/grenades/handgrenadeprojectile.mdl");
-		visualProp.SetOrigin(mainProp.GetOrigin());
-		DoEntFire("!self", "SetParent", "!activator", 0,  mainProp, visualProp);
-		visualProp.Spawn();
-		visualProp.Activate();
-		visualProp.SetSize( Vector(-1,-1,0), Vector(1,1,1));
-		visualProp.SetCollisionGroup(1);
-		visualProp.SetForwardVector(marine.GetForwardVector());
-		
-		local particle = Entities.CreateByClassname("info_particle_system");
-		particle.__KeyValueFromString("effect_name", "rifle_grenade_fx");
-		particle.__KeyValueFromString("start_active", "1");
-		particle.SetOrigin(visualProp.GetOrigin());
-		particle.Spawn();
-		particle.Activate();
-		DoEntFire("!self", "SetParent", "!activator", 0, visualProp, particle);	
+		local hGrenadeCluster = Entities.CreateByClassname("asw_boomer_blob");
+		hGrenadeCluster.SetOrigin(marine.GetOrigin() + marine.GetForwardVector()*30 + Vector(0, 0, 60));
+		hGrenadeCluster.Spawn();
+		hGrenadeCluster.Activate();
+		hGrenadeCluster.SetModel("models/swarm/grenades/HandGrenadeProjectile.mdl");
+		hGrenadeCluster.SetCollisionGroup(32);
+		hGrenadeCluster.SetForwardVector(marine.GetForwardVector());
+		NetProps.SetPropFloat( hGrenadeCluster, "m_fDetonateTime", 1337 );
 		
 		local player = null;
 		local VecCrosshairOrigin = null;
@@ -1130,153 +1135,32 @@ function OnGameEvent_weapon_offhand_activate(params)
 				VecCrosshairOrigin = NetProps.GetPropVector(player, "m_vecCrosshairTracePos");
 		}
 
-		local dirYaw = null;
-		local force = 0;
 		local marinePos = marine.GetOrigin();
-		local gravity = 800.0;
-		local vAngle = 0;
-		printl(VecCrosshairOrigin);
-		if (VecCrosshairOrigin != null && (VecCrosshairOrigin.x != 0 || VecCrosshairOrigin.y != 0)){
+		local gravity = 500.0;
+		local flightTime = 0.0;
 		
-			local parabola = createParabola(marinePos, VecCrosshairOrigin);
-			local distance = abs(parabola(null, 0));
-			
-			local VecPush = Vector(VecCrosshairOrigin.x, VecCrosshairOrigin.y, 0) - Vector(marinePos.x, marinePos.y, 0);
-			VecPush = VecPush * (1/VecPush.Length());
-			dirYaw = acos(VecPush.x)*180/PI;
-			if (VecPush.y < 0)
-				dirYaw = -dirYaw;
-			
-			vAngle = atan(abs(parabola(distance / 2.0, null)) / (distance / 2.0)) * 180 / PI;
-			local v0 =  sqrt(distance * gravity / sin(sin((vAngle * PI) / 90.0)));
-			force = abs(v0 * 6 * 50);
-			
-			printl("distance=" + distance);
-			printl("ad=" + (VecCrosshairOrigin - marinePos).Length());
-			printl("vAngle=" + vAngle);
-			printl("dirYaw=" + dirYaw);
-			printl("force=" + force);
-			
-			/*
-			local timeLet = VecPush.Length();
-			timeLet = (timeLet*2)/1000;
-			VecPush = VecPush * (1/VecPush.Length());
-			//printl(timeLet);
-			//printl(dirYaw);
-			local time = timeLet;
-			VecCrosshairOrigin = Vector(VecCrosshairOrigin.x, VecCrosshairOrigin.y, marinePos.z);
-			local VelocityVector = (VecCrosshairOrigin - marinePos - Vector(0, 0, -gravity*time*time/2)) * (1/time.tofloat());
-			VelocityVector = VelocityVector.Length();
-			//printl(time);
-			force = VelocityVector * 50/time;
-			//force *= 4.9;
-			//printl(force);
-			*/
-		} else {
-			vAngle = -50.0;
-			dirYaw = marine.GetAngles().y;
-			force = 190000;
-		}
-		
-		local thruster = Entities.CreateByClassname("phys_thruster");
-		thruster.__KeyValueFromString("attach1", mainPropName);
-		thruster.__KeyValueFromString("force", force.tostring());
-		thruster.__KeyValueFromString("forcetime", "0.1");
-		thruster.__KeyValueFromString("spawnflags", "11");
-		thruster.__KeyValueFromString("angles", (-vAngle).tostring() + " " + dirYaw.tostring() + " 0"); //marine.GetAngles().y.tostring()
-		thruster.SetOrigin(mainProp.GetOrigin());
-		thruster.Spawn();
-		thruster.Activate();
-		thruster.SetLocalAngles(0, 0, 0);
-		DoEntFire("!self", "Activate", "", 0, null, thruster);
-		DoEntFire("!self", "Kill", "", 2, null, thruster);
+		hGrenadeCluster.SetVelocity(LaunchVector(marinePos, VecCrosshairOrigin, gravity, flightTime));
 	}
 }
+//grenade cluster end
 
-/*
-function OnGameEvent_weapon_offhand_activate(params)
+//ranger spit functions
+function IsMarineInfested()
 {
-	local weapon = EntIndexToHScript( params["weapon"] );
-	local marine = EntIndexToHScript( params["marine"] );
-	if (weapon.GetClassname() == "asw_weapon_grenades"){
-		local mainProp = Entities.CreateByClassname("prop_physics_override");
-		local mainPropName = UniqueString();
-		mainProp.__KeyValueFromString("model", "models/items/personalmedkit/personalmedkit.mdl"); //models/items/personalmedkit/personalmedkit.mdl, models/gibs/antlion_gib_large_3.mdl, models/aliens/drone_gibs/gib_upper_arm.mdl
-		mainProp.__KeyValueFromString("overridescript", "mass,50");
-		mainProp.__KeyValueFromString("rendermode", "10");
-		mainProp.__KeyValueFromString("targetname", mainPropName);
-		mainProp.SetOrigin(marine.GetOrigin() + marine.GetForwardVector()*30 + Vector(0, 0, 60));
-		mainProp.Spawn();
-		mainProp.Activate();
-		mainProp.SetSize( Vector(-1,-1,0), Vector(1,1,1));
-		mainProp.SetCollisionGroup(1);
-		mainProp.SetForwardVector(marine.GetForwardVector());
-
-		local visualProp = Entities.CreateByClassname("prop_dynamic");
-		visualProp.__KeyValueFromString("model", "models/swarm/grenades/handgrenadeprojectile.mdl");
-		visualProp.SetOrigin(mainProp.GetOrigin());
-		DoEntFire("!self", "SetParent", "!activator", 0,  mainProp, visualProp);
-		visualProp.Spawn();
-		visualProp.Activate();
-		visualProp.SetSize( Vector(-1,-1,0), Vector(1,1,1));
-		visualProp.SetCollisionGroup(1);
-		visualProp.SetForwardVector(marine.GetForwardVector());
-		
-		local particle = Entities.CreateByClassname("info_particle_system");
-		particle.__KeyValueFromString("effect_name", "rifle_grenade_fx");
-		particle.__KeyValueFromString("start_active", "1");
-		particle.SetOrigin(visualProp.GetOrigin());
-		particle.Spawn();
-		particle.Activate();
-		DoEntFire("!self", "SetParent", "!activator", 0, visualProp, particle);	
-		
-		local player = null;
-		local VecCrosshairOrigin = null;
-		while((player = Entities.FindByClassname(player, "player")) != null ){
-			local m_hMarine = NetProps.GetPropEntity(player, "m_hMarine");
-			if (m_hMarine != null && m_hMarine == marine)
-				VecCrosshairOrigin = NetProps.GetPropVector(player, "m_vecCrosshairTracePos");
-		}
-
-		local dirYaw = null;
-		local force = 0;
-		if (VecCrosshairOrigin != null && (VecCrosshairOrigin.x != 0 || VecCrosshairOrigin.y != 0)){
-			local VecPush = VecCrosshairOrigin - marine.GetOrigin();
-			VecPush = VecPush * (1/VecPush.Length());
-			dirYaw = acos(VecPush.x)*180/PI;
-			if (VecPush.y < 0)
-				dirYaw = -dirYaw;
-			//printl(dirYaw);
-			local gravity = 800;
-			local time = 1;
-			local marinePos = marine.GetOrigin();
-			VecCrosshairOrigin = Vector(VecCrosshairOrigin.x, VecCrosshairOrigin.y, marinePos.z);
-			local VelocityVector = (VecCrosshairOrigin - marinePos - Vector(0, 0, -gravity*time*time/2)) * (1/time.tofloat());
-			VelocityVector = VelocityVector.Length();
-			//printl(VelocityVector);
-			force = VelocityVector * 50/time;
-			force *= 4.9;
-			printl(force);
-		} else {
-			dirYaw = marine.GetAngles().y;
-			force = 190000;
-		}
-		
-		local thruster = Entities.CreateByClassname("phys_thruster");
-		thruster.__KeyValueFromString("attach1", mainPropName);
-		thruster.__KeyValueFromString("force", force.tostring());
-		thruster.__KeyValueFromString("forcetime", "0.13");
-		thruster.__KeyValueFromString("spawnflags", "11");
-		thruster.__KeyValueFromString("angles", "-50 " + dirYaw.tostring() + " 0"); //marine.GetAngles().y.tostring()
-		thruster.SetOrigin(mainProp.GetOrigin());
-		thruster.Spawn();
-		thruster.Activate();
-		thruster.SetLocalAngles(0, 0, 0);
-		DoEntFire("!self", "Activate", "", 0, null, thruster);
-		DoEntFire("!self", "Kill", "", 2, null, thruster);
-	}
+	local isInfested = NetProps.GetPropFloat( hVictim, "m_fInfestedTime" );
+	if (isInfested == 0)
+		self.Destroy();
+	//printl(isInfested);
 }
-*/
+
+function RotateToMarineNeck()
+{
+	self.SetLocalAngles(40, 90, 0);
+	self.SetLocalOrigin(Vector(0, -3, 0));
+	self.DisconnectOutput("OnUser1", "RotateToMarineNeck");
+}
+//ranger spit functions end
+
 function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, damageType, ammoName )
 {
 	if (victim != null && victim.GetClassname() == "asw_marine" && attacker != null && attacker.IsAlien()){
@@ -1585,27 +1469,18 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 			victim.BecomeInfested();
 			parasiteProp <- CreateProp("prop_dynamic", victim.GetOrigin(), "models/aliens/parasite/parasite.mdl", 17);
 			parasiteProp.SetOwner(victim);
-			function IsMarineInfested(){
-				local isInfested = NetProps.GetPropFloat( hVictim, "m_fInfestedTime" );
-				if (isInfested == 0)
-					self.Destroy();
-				//printl(isInfested);
-			}
-			InjectThink( parasiteProp, IsMarineInfested );
-			function RotateToMarineNeck(){
-				self.SetLocalAngles(-30, 0, 0);
-				self.SetLocalOrigin(Vector(2, 0, 58));
-				self.DisconnectOutput("OnUser1", "RotateToMarineNeck");
-			}
 			parasiteProp.ValidateScriptScope();
-			parasiteProp.GetScriptScope().RotateToMarineNeck <- RotateToMarineNeck;
-			parasiteProp.GetScriptScope().hVictim <- victim;
+			local parasitePropScope = parasiteProp.GetScriptScope();
+			parasitePropScope.RotateToMarineNeck <- RotateToMarineNeck;
+			parasitePropScope.hVictim <- victim;
 			DoEntFire("!self", "SetParent", "!activator", 0,  victim, parasiteProp);
+			DoEntFire("!self", "SetParentAttachment", "anim_attachment_head", 0,  victim, parasiteProp);
 			DoEntFire("!self", "SetDefaultAnimation", "ragdoll", 0,  self, parasiteProp);
 			DoEntFire("!self", "SetAnimation", "ragdoll", 0,  self, parasiteProp);
 			DoEntFire("!self", "DisableShadow", "", 0,  self, parasiteProp);
 			parasiteProp.ConnectOutput("OnUser1", "RotateToMarineNeck");
 			DoEntFire("!self", "FireUser1", "", 0,  self, parasiteProp);
+			InjectThink( parasiteProp, IsMarineInfested );
 		}
 	}
 		
@@ -1761,14 +1636,8 @@ function Update()
 				if (NetProps.GetPropInt(weapon, "m_fireState") != 0 && (!(chainsaw.rawin(marine)))){
 					chainsaw[marine] <- Entities.CreateByClassname("prop_dynamic");
 					chainsaw[marine].__KeyValueFromString("model", "models/weapons/chainsaw/chainsaw.mdl");
-					
-					function ChainsawPos(){
-						self.SetLocalOrigin(Vector(120, 0, 40));
-						self.DisconnectOutput("OnUser1", "ChainsawPos");
-					}
 					chainsaw[marine].ValidateScriptScope();
-					chainsaw[marine].GetScriptScope().ChainsawPos <- ChainsawPos;
-					
+					chainsaw[marine].GetScriptScope().ChainsawPos <- ChainsawPos;					
 					DoEntFire("!self", "SetParent", "!activator", 0, marine, chainsaw[marine]);
 					chainsaw[marine].ConnectOutput("OnUser1", "ChainsawPos");
 					EntFireByHandle(chainsaw[marine], "FireUser1", "", 0, self, self);
