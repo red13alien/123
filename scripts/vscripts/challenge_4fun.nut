@@ -41,10 +41,10 @@ Convars.SetValue( "asw_cluster_grenade_fuse", 5 );
 Convars.SetValue( "asw_cluster_grenade_radius_check_scale", 0.2 );
 Convars.SetValue( "asw_night_vision_duration", 99999 );
 Convars.SetValue( "asw_flare_launch_delay", 0.30 );
-Convars.SetValue( "asw_flare_autoaim_radius", 2500 );
+Convars.SetValue( "asw_flare_autoaim_radius", 600 );
 Convars.SetValue( "asw_electrified_armor_duration", 30 );
-Convars.SetValue( "asw_skill_drugs_base", 0.1 );
-Convars.SetValue( "asw_skill_drugs_step", 5 );
+Convars.SetValue( "asw_skill_drugs_base", 0 );
+Convars.SetValue( "asw_skill_drugs_step", 0 );
 Convars.SetValue( "asw_skill_mines_fires_base", 4 );
 Convars.SetValue( "asw_skill_mines_fires_step", 0 );
 Convars.SetValue( "asw_skill_healing_hps_base", 99 );
@@ -121,13 +121,14 @@ Convars.SetValue( "rd_notify_about_out_of_ammo", 0 );
 Convars.SetValue( "rd_sentry_is_attacked_by_aliens", 0 );
 Convars.SetValue( "rd_sentry_invincible", 1 );
 Convars.SetValue( "rd_slowmo", 0 );
-
-/*
 Convars.SetValue( "asw_skill_reloading_fast_base", 0 );
 Convars.SetValue( "asw_skill_reloading_fast_step", 0 );
 Convars.SetValue( "asw_skill_reloading_step", 0 );
-Convars.SetValue( "asw_skill_reloading_base", 1.5 );
-*/
+Convars.SetValue( "asw_skill_reloading_base", 3 );
+Convars.SetValue( "rd_extinguisher_dmg_amount", 0.1 );
+Convars.SetValue( "rd_extinguisher_freeze_amount", 0.2 );
+Convars.SetValue( "rd_fire_extinguisher_infinite", 1 );
+Convars.SetValue( "rd_allow_revive", 0 );
 
 infWeapon <- [
 	"asw_weapon_rifle",
@@ -139,7 +140,6 @@ infWeapon <- [
 	"asw_weapon_deagle",
 	"asw_weapon_devastator",
 	"asw_weapon_flamer",
-	"asw_weapon_grenade_launcher",
 	"asw_weapon_mining_laser",
 	"asw_weapon_pdw",
 	"asw_weapon_pistol",
@@ -324,12 +324,35 @@ ammoEntities <- [
 local target = Entities.CreateByClassname("info_target");
 target.PrecacheModel("models/swarm/harvester/Harvester.mdl");
 
-asw_marine_ff_absorption <- Convars.GetStr("asw_marine_ff_absorption");
-
-if ( asw_marine_ff_absorption != "0" )
+if ( Convars.GetStr("asw_marine_ff_absorption") != "0" )
 {
 	Convars.SetValue( "asw_skill_hacking_speed_base", 99 );
 	Convars.SetValue( "asw_simple_hacking", 1 );
+} else Convars.SetValue( "rd_marine_ff_fist", 1 );
+
+function InjectThink(scrEnt, thinkFunc) //https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_Functions
+{
+   scrEnt.ValidateScriptScope();
+   local scrScope = scrEnt.GetScriptScope();
+   scrScope.InjectedThink <- thinkFunc;
+   AddThinkToEnt( scrEnt, "InjectedThink" );
+}
+// and then you could call it like so to have a spawned entity call a common think passing itself as an argument
+// InjectThink( myEnt, @() g_MapScript.InjectedThink(self))
+// or of course whatever function you want/local thing, etc
+
+function IsMarineInfested() //destroy parasite prop
+{
+	local isInfested = NetProps.GetPropFloat( hVictim, "m_fInfestedTime" );
+	if (isInfested == 0)
+		self.Destroy();
+}
+
+function RotateToMarineNeck() //rotate parasite
+{
+	self.SetLocalAngles(40, 90, 0);
+	self.SetLocalOrigin(Vector(0, -3, 0));
+	self.DisconnectOutput("OnUser1", "RotateToMarineNeck");
 }
 
 function OnGameEvent_entity_killed(params)
@@ -356,57 +379,80 @@ function OnGameEvent_sentry_start_building(params)
 	sentry.SetSize( Vector(0,0,0), Vector(0,0,0));
 }
 
-function SpawnChanger(AName, AClass)
+function OnGameEvent_weapon_reload_finish(params)
+{
+	local marine = EntIndexToHScript( params["marine"] );
+	local hActiveWeapon = NetProps.GetPropEntity(marine, "m_hActiveWeapon");
+	if (hActiveWeapon && hActiveWeapon.GetClassname() == "asw_weapon_grenade_launcher")
+		hActiveWeapon.SetClip1(14);
+}
+
+function SpawnChanger(AName, AClass, Health)
 {
 	local alien = null;
 	while ( ( alien = Entities.FindByClassname( alien, AName ) ) != null ){
-		local vector = alien.GetOrigin() + Vector (0, 0, 10);
-		local spawner = Entities.CreateByClassname("asw_spawner");
-		spawner.SetOrigin(vector);
-		spawner.__KeyValueFromString("AlienClass", AClass);
-		spawner.__KeyValueFromString("AlienOrders", "3");
-		spawner.__KeyValueFromString("MaxLiveAliens", "1");
-		spawner.__KeyValueFromString("SpawnerState", "1");
-		spawner.__KeyValueFromString("ClearCheck", "0");
-		spawner.__KeyValueFromString("SpawnIfMarinesAreNear", "1");
-		spawner.__KeyValueFromString("NumAliens", "1");
-		spawner.Spawn();
-		DoEntFire("!self", "StartSpawning", "", 0, null, spawner);
-		DoEntFire("!self", "Kill", "", 2, null, spawner);
-		alien.Destroy();
+		if (alien.GetName() != ""){
+			alien.SetMaxHealth(alien.GetHealth()+Health);
+			alien.SetHealth(alien.GetHealth()+Health);
+			EntFireByHandle(alien, "Color", (RandomInt(0, 255)).tostring() + " " + (RandomInt(0, 255)).tostring() + " " + (RandomInt(0, 255)).tostring(), 0, self, self);
+		} else {
+			local spawner = Entities.CreateByClassname("asw_spawner");
+			spawner.SetOrigin(alien.GetOrigin() + Vector (0, 0, 10));
+			spawner.__KeyValueFromString("AlienClass", AClass);
+			spawner.__KeyValueFromString("AlienOrders", "3");
+			spawner.__KeyValueFromString("MaxLiveAliens", "1");
+			spawner.__KeyValueFromString("SpawnerState", "1");
+			spawner.__KeyValueFromString("ClearCheck", "0");
+			spawner.__KeyValueFromString("SpawnIfMarinesAreNear", "1");
+			spawner.__KeyValueFromString("NumAliens", "1");
+			spawner.Spawn();
+			DoEntFire("!self", "Startspawner", "", 0, null, spawner);
+			DoEntFire("!self", "Kill", "", 2, null, spawner);
+			alien.Destroy();
+		}
 	}
 }
-
-if (GetMapName() != "rd-lan2_sewer" && GetMapName() != "rd-TFT3Spaceport" )
-	SpawnChanger("asw_shieldbug", "3" );
-else {
-	shield <- null;
-	while ( ( shield = Entities.FindByClassname( shield, "asw_shieldbug" ) ) != null ){
-		shield.SetHealth(shield.GetHealth()+30000);
-		EntFireByHandle(shield, "Color", "101 134 74", 0, self, self);
-	}
-}
-SpawnChanger("asw_ranger", "10" );
-SpawnChanger("asw_boomer", "9" );
-SpawnChanger("asw_harvester", "6" );
-SpawnChanger("asw_mortarbug", "11" );
 
 function SpawnerChanger(AlnCLASS, VScript, HealthBonus, SpeedScale, SizeScale, Min, Max )
 {
-	if (spawning.GetKeyValue("AlienClass") == AlnCLASS){
+	if (hSpawner.GetKeyValue("AlienClass") == AlnCLASS){
 		if (VScript != 0)
-			spawning.__KeyValueFromString("alien_vscripts", VScript);
+			hSpawner.__KeyValueFromString("alien_vscripts", VScript);
 		if (HealthBonus != 0)
-			spawning.__KeyValueFromString("healthbonussp", HealthBonus);
+			hSpawner.__KeyValueFromString("healthbonussp", HealthBonus);
 		if (SpeedScale != 0)
-			spawning.__KeyValueFromString("speedscalesp", SpeedScale);
+			hSpawner.__KeyValueFromString("speedscalesp", SpeedScale);
 		if (SizeScale != 0)
-			spawning.__KeyValueFromString("sizescalesp", RandomFloat( Min, Max ).tostring());
+			hSpawner.__KeyValueFromString("sizescalesp", RandomFloat( Min, Max ).tostring());
 	}
 }
 
-spawning <- null;
-while((spawning = Entities.FindByClassname(spawning, "asw_spawner")) != null){
+function OnMissionStart()
+{
+	local timer = Entities.CreateByClassname("logic_timer");
+	timer.__KeyValueFromFloat("RefireTime", 0.3);
+	DoEntFire("!self", "Disable", "", 0, null, timer);
+	timer.ValidateScriptScope();
+	timer.GetScriptScope().find_gl_func <- function()
+	{
+		local find_gl = null;
+		while ( ( find_gl = Entities.FindByClassname( find_gl, "asw_weapon_grenade_launcher" ) ) != null )
+			find_gl.SetClip1(14);
+		self.DisconnectOutput("OnTimer", "find_gl_func");
+		self.Destroy();	
+	}
+	timer.ConnectOutput("OnTimer", "find_gl_func");
+	DoEntFire("!self", "Enable", "", 0, null, timer);
+}
+
+SpawnChanger("asw_ranger", "10", 4000);
+SpawnChanger("asw_boomer", "9", 20000);
+SpawnChanger("asw_harvester", "6", 4000);
+SpawnChanger("asw_mortarbug", "11", 4000);
+SpawnChanger("asw_shieldbug", "3", 10000);
+
+hSpawner <- null;
+while((hSpawner = Entities.FindByClassname(hSpawner, "asw_spawner")) != null){
 	SpawnerChanger("0", 0, 0, 0, 1, 1.3, 1.5 );
 	SpawnerChanger("11", "4fun_mortar.nut", "4000",0, 1, 1.8, 2.2 );
 	SpawnerChanger("6", "4fun_harvester.nut", "4000", 0, 1, 1.5, 3 );
@@ -437,33 +483,42 @@ if (GetMapName() == "rd-lan1_bridge" )
 }
 
 function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, damageType, ammoName )
-{	
-	if ( attacker != null && attacker.GetClassname() == "asw_ranger" ){
-		if ( victim != null && victim.GetClassname() == "asw_marine" ){
+{
+	if (inflictor != null && inflictor.GetClassname() == "asw_missile_round" && inflictor.GetOwner().GetClassname() == "asw_ranger"){
+		if (victim != null && victim.GetClassname() == "asw_marine"){
+			victim.TakeDamage(10, 131072, attacker); //do buzzer poison damage
 			if ( Convars.GetStr("rd_challenge") == "4fun" ){
-				Director.SpawnAlienAt("asw_parasite", victim.GetOrigin() + Vector (50, 0, 80), victim.GetAngles());
-				Director.SpawnAlienAt("asw_parasite", victim.GetOrigin() + Vector (-50, 0, 80), victim.GetAngles());
-				Director.SpawnAlienAt("asw_parasite_defanged", victim.GetOrigin() + Vector (0, 50, 80), victim.GetAngles());
-				Director.SpawnAlienAt("asw_parasite_defanged", victim.GetOrigin() + Vector (0, -50, 80), victim.GetAngles());
-				Director.SpawnAlienAt("asw_buzzer", victim.GetOrigin() + Vector (0, 0, 150), victim.GetAngles());
-			} else
-				Director.SpawnAlienAt("asw_buzzer", victim.GetOrigin() + Vector (0, 0, 150), victim.GetAngles());
-		}		
+				victim.BecomeInfested(); //infest marine
+				parasiteProp <- CreateProp("prop_dynamic", victim.GetOrigin(), "models/aliens/parasite/parasite.mdl", 17); //create parasite like in default game, but with one position
+				parasiteProp.SetOwner(victim);
+				parasiteProp.ValidateScriptScope();
+				local parasitePropScope = parasiteProp.GetScriptScope();
+				parasitePropScope.RotateToMarineNeck <- RotateToMarineNeck;
+				parasitePropScope.hVictim <- victim;
+				DoEntFire("!self", "SetParent", "!activator", 0,  victim, parasiteProp);
+				DoEntFire("!self", "SetParentAttachment", "anim_attachment_head", 0,  victim, parasiteProp);
+				DoEntFire("!self", "SetDefaultAnimation", "ragdoll", 0,  self, parasiteProp);
+				DoEntFire("!self", "SetAnimation", "ragdoll", 0,  self, parasiteProp);
+				DoEntFire("!self", "DisableShadow", "", 0,  self, parasiteProp);
+				parasiteProp.ConnectOutput("OnUser1", "RotateToMarineNeck");
+				DoEntFire("!self", "FireUser1", "", 0,  self, parasiteProp);
+				InjectThink( parasiteProp, IsMarineInfested );
+			}
+		}
 	}
-
+	
 	local dam = 0;
 
 	if (weapon != null && (weapon.GetClassname() in damageTable)){
 		damage += damageTable[weapon.GetClassname()];
 		if ( victim != null && victim.GetClassname() == "asw_marine" ){
-			if (asw_marine_ff_absorption == "0"){
+			if (Convars.GetFloat("asw_marine_ff_absorption").tointeger() == 0){
 				damage = 0;
 				dam = backfireDamageTable[weapon.GetClassname()];
 			}
 			else damage = friendlyDamageTable[weapon.GetClassname()];
 		}
 	}
-
 	
 	if(weapon != null){
 		switch(weapon.GetClassname()) {
@@ -472,8 +527,13 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 					damage = 3;
 				break;
 			case "asw_weapon_rifle":
-				if ( victim != null && victim == attacker )
-					damage = 40;
+				if (inflictor != null && inflictor.GetClassname() == "asw_rifle_grenade" && inflictor.GetOwner() == attacker){
+					if (victim != null){
+						if (victim.GetClassname() == "asw_marine")
+							damage = 40;
+						else damage += 1000;
+					}
+				}
 				break;
 			case "asw_weapon_deagle":
 				local explosion = Entities.CreateByClassname("env_explosion");
@@ -526,11 +586,13 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 			case "asw_weapon_flamer":
 				dam = 0;
 				if ( victim != null && victim.GetClassname() == "asw_marine" ){
-					if (victim.GetHealth() <= victim.GetMaxHealth())
-						victim.SetHealth(victim.GetHealth() + (victim.GetMaxHealth()/40));	
-				}
-				if ( victim != null )
-					damage = 0;
+					if (victim.GetHealth() <= victim.GetMaxHealth()){
+						victim.SetHealth(victim.GetHealth() + (victim.GetMaxHealth()/40));
+						if (attacker.GetHealth() <= attacker.GetMaxHealth())
+							attacker.SetHealth(attacker.GetHealth() + (attacker.GetMaxHealth()/40));
+					}
+				} else if ( victim != null )
+					damage = 1;
 				break;
 			case "asw_weapon_sniper_rifle":	
 				if ( attacker != null && attacker.GetClassname() == "asw_marine" ){
@@ -542,7 +604,7 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 						DoEntFire("!self", "Kill", "", 0.5, null, explosion);
 						local A = attacker.GetOrigin();
 						local B = victim.GetOrigin();
-						local fDistance = sqrt( (A.x - B.x) * (A.x - B.x) + (A.y - B.y) * (A.y - B.y) + (A.z - B.z) * (A.z - B.z) );
+						local fDistance = (A - B).Length();
 						local iDmg = 5;
 						if (fDistance >= 500.0){
 							damage = victim.GetHealth();
@@ -574,15 +636,14 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 				break;
 			case "asw_weapon_grenade_launcher":
 				if ( victim != null && victim.GetClassname() == "asw_marine" && victim != attacker ){
-					if (asw_marine_ff_absorption == "0"){
+					if (Convars.GetFloat("asw_marine_ff_absorption").tointeger() == 0){
 						damage = 0;
 						dam = 90;
-					}
-					else damage = 30;
+					} else damage = 30;
 				}
 				break;
 			case "asw_weapon_tesla_gun":
-				if ( victim != null && victim.GetClassname() != "asw_marine"){
+				if (victim != null && victim.GetClassname() != "asw_marine"){
 					local scale = 0;
 					if ( victim.GetName() == "asw_4fun_drone_giant" )
 						scale = 0.3; else
@@ -593,18 +654,26 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 						DoEntFire("!self", "AddOutput", "speedscale -1", 0, null, nearTarget);
 						DoEntFire("!self", "AddOutput", "speedscale " + scale.tostring(), 1, null, nearTarget);	
 					}
-					if ( victim.GetClassname() == "asw_drone" ){
+					if (victim.GetClassname() == "asw_drone"){
 						DoEntFire("!self", "AddOutput", "speedscale -1", 0, null, victim);
 						DoEntFire("!self", "AddOutput", "speedscale " + scale.tostring(), 5, null, victim);
 					}
 				}
 				damage = victim.GetHealth()/20;
 				break;
+			case "asw_marine":
+				if (attacker != null && attacker.GetClassname() == "asw_marine"){
+					if (inflictor != null && inflictor.GetClassname() == "asw_marine"){
+						if (victim != null && victim.GetClassname() == "asw_marine")
+							damage = victim.GetMaxHealth()/16;
+					}
+				}
+				break;
 			default: break;
 		}
 	}
-	
-	if (asw_marine_ff_absorption == "0"){
+
+	if (Convars.GetFloat("asw_marine_ff_absorption").tointeger() == 0){
 		if ( attacker != null && attacker.GetClassname() == "asw_marine" ){
 			if ( victim != null && victim.GetClassname() == "asw_marine" && victim != attacker ){
 				if (inflictor != null && inflictor.GetClassname() != "asw_burning" 
@@ -627,7 +696,7 @@ function OnTakeDamage_Alive_Any( victim, inflictor, attacker, weapon, damage, da
 			}
 		}
 	}
-	
+
 	return damage;
 }
 g_ModeScript.OnTakeDamage_Alive_Any <- OnTakeDamage_Alive_Any;
@@ -642,8 +711,23 @@ function Update()
 		}
 	}
 
-	minDelay <- 0.2;
-	marine <- null;
+	if (VoteStarted != 0 && VoteStarted + 30 <= Time()){
+		Reason = null;
+		UserID = {};
+		VoteStarted = 0;
+		Voted = 0;
+		Vote = null;
+		PlayerCount = 0;
+	}
+	
+	local hDoor = null;
+	while ( (hDoor = Entities.FindByClassname( hDoor, "asw_door" )) != null ){
+		if (hDoor.GetHealth() <= 0)
+			DoEntFire("!self", "Kill", "", 2, null, hDoor);
+	}
+	
+	local minDelay = 0.2;
+	local marine = null;
 	while ( (marine = Entities.FindByClassname( marine, "asw_marine" )) != null ){
         for (local weapon = marine.FirstMoveChild(); weapon != null; weapon = weapon.NextMovePeer()){
 			if ( !( "GetMaxClip1" in weapon ) )
@@ -655,7 +739,7 @@ function Update()
 					weapon.SetClip1(maxClip1);
 			}
 
-			if (weapon.GetClassname() == "asw_weapon_railgun" && weapon.GetClips() < 2)
+			if ((weapon.GetClassname() == "asw_weapon_railgun" || weapon.GetClassname() == "asw_weapon_grenade_launcher") && weapon.GetClips() < 2)
 				weapon.SetClips(2);
 
             if (weapon.GetClassname() in regenDelay){
@@ -728,4 +812,242 @@ function Update()
 	timeBetweenInverse1 = 75;
 	timeAfterShoot1 = 5;
 	return minDelay;
+}
+
+UserID <- {};
+VoteStarted <- 0;
+Voted <- 0;
+PlayerCount <- 0;
+Vote <- null;
+Reason <- null;
+function OnGameEvent_player_say(params)
+{
+	foreach(index, value in params)
+	{
+		printl(index + " <-index" + value + " <-value");
+	}
+	
+	if (!("text" in params)) //stolen :)
+		return;
+	else if (params["text"] == null)
+		return;
+	
+	local ID = EntIndexToHScript( params["userid"] );
+	//printl(ID);
+	if (ID == null)
+		ID = 1;
+	//printl(ID);
+
+	local player = null;
+	while((player = Entities.FindByClassname(player, "player")) != null)
+		PlayerCount += 1;
+		
+	switch ((params["text"]).tolower()){
+		case "start_vote_carnage_1":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Carnage scale set to 1");
+				Convars.SetValue("rd_carnage_scale", 1);
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 1;
+				Reason = "Carnage";
+			}
+			break;
+		case "start_vote_carnage_2":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Carnage scale set to 2");
+				Convars.SetValue("rd_carnage_scale", 2);
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 2;
+				Reason = "Carnage";
+			}
+			break;
+		case "start_vote_carnage_3":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Carnage scale set to 3");
+				Convars.SetValue("rd_carnage_scale", 3);
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 3;
+				Reason = "Carnage";
+			}
+			break;
+		case "start_vote_carnage_4":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Carnage scale set to 4");
+				Convars.SetValue("rd_carnage_scale", 4);
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 4;
+				Reason = "Carnage";
+			}
+			break;
+		case "start_vote_carnage_5":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Carnage scale set to 5");
+				Convars.SetValue("rd_carnage_scale", 5);
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 5;
+				Reason = "Carnage";
+			}
+			break;
+		case "start_vote_carnage_6":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Carnage scale set to 6");
+				Convars.SetValue("rd_carnage_scale", 6);
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 6;
+				Reason = "Carnage";
+			}
+			break;
+		case "start_vote_backfire_on":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Backfire set to 1");
+				Convars.SetValue("asw_marine_ff_absorption", 0);
+				Convars.SetValue( "rd_marine_ff_fist", 1 );
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 0;
+				Reason = "Backfire";
+			}
+			break;
+		case "start_vote_backfire_off":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Backfire set to 0");
+				Convars.SetValue("asw_marine_ff_absorption", 1);
+				Convars.SetValue( "rd_marine_ff_fist", 0 );
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 1;
+				Reason = "Backfire";
+			}
+			break;
+		case "start_vote_simple_hack_on":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Simple hack set to 1");
+				Convars.SetValue( "asw_skill_hacking_speed_base", 99 );
+				Convars.SetValue( "asw_simple_hacking", 1 );
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 1;
+				Reason = "Simple";
+			}
+			break;
+		case "start_vote_simple_hack_off":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Simple hack set to 0");
+				Convars.SetValue( "asw_skill_hacking_speed_base", 2 );
+				Convars.SetValue( "asw_simple_hacking", 0 );
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 0;
+				Reason = "Simple";
+			}
+			break;
+		case "start_vote_revive_on":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Revive set to 1");
+				Convars.SetValue( "rd_allow_revive", 1 );
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 1;
+				Reason = "Revive";
+			}
+			break;
+		case "start_vote_revive_off":
+			if (ID == 1){
+				local player = null;
+				while((player = Entities.FindByClassname(player, "player")) != null)
+					ClientPrint(player, 3, "Revive set to 0");
+				Convars.SetValue( "rd_allow_revive", 1 );
+				ID = 0;
+				return;
+			} else if (VoteStarted == 0){
+				VoteStarted = Time();
+				Vote = 0;
+				Reason = "Revive";
+			}
+			break;
+		case "+":
+			if (VoteStarted + 30 >= Time() && !UserID.rawin(ID)){
+				Voted += 1;
+				ShowMessage(Voted + " of " + PlayerCount + " voted");
+				UserID[ID] <- ID;
+				if ((PlayerCount >= 2 && PlayerCount/Voted <= 2) || (PlayerCount <= 2 && Voted == PlayerCount)){
+					if (Reason == "Carnage"){
+						ShowMessage("Carnage scale set to " + Vote);
+						Convars.SetValue("rd_carnage_scale", Vote);
+					} else if (Reason == "Backfire"){
+						Convars.SetValue("asw_marine_ff_absorption", Vote);
+						Convars.SetValue( "rd_marine_ff_fist", !Vote );
+						ShowMessage("Backfire set to " + !Vote);
+					} else if (Reason == "Simple"){
+						Convars.SetValue( "asw_simple_hacking", Vote );
+						ShowMessage("Simple hack set to " + Vote);
+						if (Vote)
+							Vote = 99;
+						else Vote = 2;
+						Convars.SetValue( "asw_skill_hacking_speed_base", Vote );
+					} else if (Reason == "Revive"){
+						ShowMessage("Revive set to " + Vote);
+						Convars.SetValue( "rd_allow_revive", Vote );
+					}
+					Reason = null;
+					UserID = {};
+					VoteStarted = 0;
+					Voted = 0;
+					Vote = null;
+					PlayerCount = 0;
+				}
+			}
+			break;
+		default: break;
+	}
 }
